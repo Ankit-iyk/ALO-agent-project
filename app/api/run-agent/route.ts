@@ -5,45 +5,30 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const MODEL = "gemini-2.5-flash";
 
 async function callAgent(agentName: string, systemPrompt: string, userPrompt: string): Promise<string> {
-  const model = genAI.getGenerativeModel({
-    model: MODEL,
-    systemInstruction: systemPrompt,
-  });
+  try {
+    const model = genAI.getGenerativeModel({
+      model: MODEL,
+      systemInstruction: systemPrompt,
+    });
 
-  const result = await model.generateContent(userPrompt);
-  return result.response.text();
+    const result = await model.generateContent(userPrompt);
+    return result.response.text();
+  } catch (error: any) {
+    if (error.status === 429) {
+      throw new Error("API quota exceeded. You've reached the daily limit for the free tier (20 requests). Please upgrade your plan at https://ai.google.dev/gemini-api/docs/rate-limits or wait until tomorrow for the quota to reset.");
+    }
+    throw error;
+  }
 }
 
 const PLANNER_PROMPT = `You are the Planner Agent. Break down ANY high-level user goal into 4-6 clear, prioritized sub-goals.
 Respond ONLY with valid JSON structure: {"sub_goals": [{"title": "...", "priority": "high", "rationale": "...", "timeline": "...", "category": "..."}], "overall_strategy": "...", "success_metrics": ["..."]}`;
 
-const RESEARCHER_PROMPT = `You are the Researcher Agent. Given a user goal and sub-goals, provide actionable insights.
-Respond ONLY with valid JSON: {"key_findings": [{"finding": "...", "source_type": "...", "actionability": "high"}], "quick_wins": ["..."], "common_pitfalls": ["..."], "resources": [{"title": "...", "type": "...", "relevance": "..."}]}`;
-
 const EXECUTOR_PROMPT = `You are the Executor Agent. Convert plans into a daily/weekly schedule.
 Respond ONLY with valid JSON: {"daily_schedule": [{"time": "...", "task": "...", "duration": "...", "category": "...", "priority": "high"}], "weekly_milestones": [{"week": 1, "milestone": "...", "tasks": ["..."], "kpi": "..."}], "immediate_actions": ["..."], "reasoning": "..."}`;
 
-const CONFLICT_RESOLVER_PROMPT = `You are the Conflict Resolver Agent. Ensure the executor's schedule has no overlaps or burnout risks. 
-Fix resource constraints and output an optimized schedule.
-Respond ONLY with valid JSON: {"resolved_schedule": [{"time": "...", "task": "...", "duration": "...", "adjustment_reason": "..."}], "conflicts_avoided": ["..."], "optimization_score": 95}`;
-
-const PERSONALIZATION_PROMPT = `You are the Personalization Agent. Adapt the resolved schedule based on the user's profile (age, occupation, health, etc.).
-Respond ONLY with valid JSON: {"adapted_tasks": [{"original_task": "...", "adapted_task": "...", "personalization_factor": "..."}], "difficulty_adjustments": ["..."], "focus_recommendations": ["..."]}`;
-
-const SIMULATOR_PROMPT = `You are the Simulator Agent. Predict outcomes, KPIs, risk factors, and success probabilities for the personalized plan.
-Respond ONLY with valid JSON: {"predicted_kpis": [{"metric": "...", "value_by_day_30": "..."}], "success_probability": 85, "risk_factors": [{"risk": "...", "mitigation": "..."}], "recommended_path": "..."}`;
-
-const CRITIC_PROMPT = `You are the Critic Agent. Evaluate the entire plan's feasibility.
+const CRITIC_PROMPT = `You are the Critic Agent. Evaluate the entire plan's feasibility and execution quality.
 Respond ONLY with valid JSON: {"overall_score": 85, "strengths": ["..."], "weaknesses": ["..."], "improvements": [{"area": "...", "suggestion": "...", "impact": "high"}], "optimized_focus": "..."}`;
-
-const MEMORY_PROMPT = `You are the Memory Agent. Synthesize outputs and create a Mermaid.js reasoning flow.
-Respond ONLY with valid JSON: {"session_summary": "...", "key_decisions": ["..."], "mermaid_chart": "graph TD\\n A[User Goal] --> B[Planner]", "next_iteration_focus": "..."}`;
-
-const NOTIFICATION_PROMPT = `You are the Notification Agent. Design push notifications and alerts based on the schedule.
-Respond ONLY with valid JSON: {"push_notifications": [{"trigger_time": "...", "message": "...", "urgency": "high|medium"}], "reminder_strategy": "..."}`;
-
-const ANALYTICS_PROMPT = `You are the Analytics Agent. Define JSON data structures for frontend progress graphs based on predicted KPIs.
-Respond ONLY with valid JSON: {"chart_data": [{"day": 1, "progress": 10}, {"day": 7, "progress": 30}], "dashboard_metrics": [{"label": "...", "value": "...", "trend": "up|down"}]}`;
 
 function safeJsonParse(text: string): Record<string, unknown> {
   try {
@@ -52,6 +37,109 @@ function safeJsonParse(text: string): Record<string, unknown> {
   } catch {
     return { raw: text, parse_error: true };
   }
+}
+
+// Mock responses for reduced API calls
+function generateMockResearch(plan: Record<string, unknown>): Record<string, unknown> {
+  return {
+    key_findings: [
+      { finding: "Goal aligns with current market trends", source_type: "analysis", actionability: "high" },
+      { finding: "Timeline is realistic based on similar goals", source_type: "historical_data", actionability: "high" },
+      { finding: "Resource requirements are manageable", source_type: "estimation", actionability: "medium" }
+    ],
+    quick_wins: ["Start with highest priority sub-goal", "Allocate 30% of time to planning", "Set weekly check-ins"],
+    common_pitfalls: ["Underestimating time requirements", "Scope creep", "Insufficient break time"],
+    resources: [
+      { title: "Project Management Best Practices", type: "guide", relevance: "high" },
+      { title: "Time Management Tools", type: "tool", relevance: "medium" }
+    ]
+  };
+}
+
+function generateMockConflictResolution(execution: Record<string, unknown>): Record<string, unknown> {
+  return {
+    resolved_schedule: (execution.daily_schedule as any[])?.map((task: any) => ({
+      ...task,
+      adjustment_reason: "Optimized for focus and recovery time"
+    })) || [],
+    conflicts_avoided: ["Overlapping task times", "Burnout from consecutive high-intensity tasks"],
+    optimization_score: 92
+  };
+}
+
+function generateMockPersonalization(conflict: Record<string, unknown>): Record<string, unknown> {
+  return {
+    adapted_tasks: [
+      { original_task: "Morning planning session", adapted_task: "Evening planning session", personalization_factor: "Night owl preference" },
+      { original_task: "Standard 8-hour work blocks", adapted_task: "Intense 3-4 hour sprints", personalization_factor: "Prefers short intense work periods" }
+    ],
+    difficulty_adjustments: ["Reduced early morning commitments", "Added energy recovery breaks"],
+    focus_recommendations: ["Peak focus hours: 8 PM - 11 PM", "Recovery time needed after sprints"]
+  };
+}
+
+function generateMockSimulation(personalization: Record<string, unknown>): Record<string, unknown> {
+  return {
+    predicted_kpis: [
+      { metric: "Goal Completion % by Day 30", value_by_day_30: "85%" },
+      { metric: "Average Daily Progress", value_by_day_30: "6.8% per day" },
+      { metric: "Milestone Hit Rate", value_by_day_30: "92%" }
+    ],
+    success_probability: 87,
+    risk_factors: [
+      { risk: "Scope expansion", mitigation: "Weekly scope review meetings" },
+      { risk: "Burnout from sprints", mitigation: "Mandatory 2-day recovery weekends" }
+    ],
+    recommended_path: "Follow the optimized schedule with built-in buffer time"
+  };
+}
+
+function generateMockMemory(plan: Record<string, unknown>, critique: Record<string, unknown>): Record<string, unknown> {
+  return {
+    session_summary: "Successfully created and validated a comprehensive action plan with 87% success probability",
+    key_decisions: [
+      "Prioritized high-impact sub-goals first",
+      "Adapted schedule for night owl preferences",
+      "Included weekly validation checkpoints"
+    ],
+    mermaid_chart: `graph TD
+      A["User Goal"] --> B["Planner Agent"]
+      B --> C["Execution Plan"]
+      C --> D["Conflict Resolution"]
+      D --> E["Personalization"]
+      E --> F["Simulation"]
+      F --> G["Critic Review"]
+      G --> H["Validated Plan"]`,
+    next_iteration_focus: "Monitor week 1 KPIs and adjust sprint intensity based on actual energy levels"
+  };
+}
+
+function generateMockNotification(personalization: Record<string, unknown>): Record<string, unknown> {
+  return {
+    push_notifications: [
+      { trigger_time: "8:00 PM", message: "Your peak focus time is starting. Begin sprint session.", urgency: "medium" },
+      { trigger_time: "11:00 PM", message: "Sprint recovery: time to wind down and plan tomorrow.", urgency: "medium" },
+      { trigger_time: "Monday 8:00 PM", message: "Weekly milestone check-in: review progress and adjust if needed.", urgency: "high" }
+    ],
+    reminder_strategy: "Push notifications at peak focus times and milestone checkpoints"
+  };
+}
+
+function generateMockAnalytics(simulation: Record<string, unknown>): Record<string, unknown> {
+  return {
+    chart_data: [
+      { day: 1, progress: 5 },
+      { day: 7, progress: 32 },
+      { day: 14, progress: 58 },
+      { day: 21, progress: 75 },
+      { day: 30, progress: 85 }
+    ],
+    dashboard_metrics: [
+      { label: "Success Probability", value: "87%", trend: "up" },
+      { label: "Completion Rate", value: "85%", trend: "up" },
+      { label: "Risk Level", value: "Low", trend: "down" }
+    ]
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -66,7 +154,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "GEMINI_API_KEY not configured. Add it to .env" }, { status: 500 });
     }
 
-    // Mock User Context (since we only receive string input from UI currently)
+    // Mock User Context
     const mockContext = {
       user_profile: { age: 28, occupation: "Software Engineer", preferences: "Night owl, prefers intense short sprints" },
       health_metrics: { avg_sleep: "6.5h", fitness_level: "Intermediate" },
@@ -76,50 +164,34 @@ export async function POST(req: NextRequest) {
 
     const goalContext = `User Goal: ${goal}${contextStr}`;
 
+    // Only 3 API calls to stay within free tier limits (20 requests/day)
+    
     // 1. Planner
     const plannerRaw = await callAgent("Planner", PLANNER_PROMPT, goalContext);
     const plannerOutput = safeJsonParse(plannerRaw);
 
-    // 2. Researcher
-    const researcherRaw = await callAgent("Researcher", RESEARCHER_PROMPT, `${goalContext}\n\nPlanner: ${JSON.stringify(plannerOutput)}`);
-    const researcherOutput = safeJsonParse(researcherRaw);
-
-    // 3. Executor
-    const executorRaw = await callAgent("Executor", EXECUTOR_PROMPT, `${goalContext}\n\nPlan: ${JSON.stringify(plannerOutput)}\n\nResearch: ${JSON.stringify(researcherOutput)}`);
+    // 2. Executor
+    const executorRaw = await callAgent("Executor", EXECUTOR_PROMPT, `${goalContext}\n\nPlan: ${JSON.stringify(plannerOutput)}`);
     const executorOutput = safeJsonParse(executorRaw);
 
-    // 4. Conflict Resolver
-    const conflictRaw = await callAgent("Conflict Resolver", CONFLICT_RESOLVER_PROMPT, `${goalContext}\n\nExecutor Schedule: ${JSON.stringify(executorOutput)}`);
-    const conflictOutput = safeJsonParse(conflictRaw);
-
-    // 5. Personalization
-    const personRaw = await callAgent("Personalization", PERSONALIZATION_PROMPT, `${goalContext}\n\nResolved Schedule: ${JSON.stringify(conflictOutput)}`);
-    const personOutput = safeJsonParse(personRaw);
-
-    // 6. Simulator
-    const simulatorRaw = await callAgent("Simulator", SIMULATOR_PROMPT, `${goalContext}\n\nAdapted Tasks: ${JSON.stringify(personOutput)}`);
-    const simulatorOutput = safeJsonParse(simulatorRaw);
-
-    // 7. Critic
-    const criticRaw = await callAgent("Critic", CRITIC_PROMPT, `${goalContext}\n\nPlan: ${JSON.stringify(plannerOutput)}\n\nSimulator Params: ${JSON.stringify(simulatorOutput)}`);
+    // 3. Critic
+    const criticRaw = await callAgent("Critic", CRITIC_PROMPT, `${goalContext}\n\nPlan: ${JSON.stringify(plannerOutput)}\n\nExecution: ${JSON.stringify(executorOutput)}`);
     const criticOutput = safeJsonParse(criticRaw);
 
-    // 8. Memory
-    const memoryRaw = await callAgent("Memory", MEMORY_PROMPT, `${goalContext}\n\nPlan: ${JSON.stringify(plannerOutput)}\n\nCritic Review: ${JSON.stringify(criticOutput)}`);
-    const memoryOutput = safeJsonParse(memoryRaw);
-
-    // 9. Notification
-    const notifRaw = await callAgent("Notification", NOTIFICATION_PROMPT, `${goalContext}\n\nAdapted Tasks: ${JSON.stringify(personOutput)}`);
-    const notifOutput = safeJsonParse(notifRaw);
-
-    // 10. Analytics
-    const analyticsRaw = await callAgent("Analytics", ANALYTICS_PROMPT, `${goalContext}\n\nSimulator Prediction: ${JSON.stringify(simulatorOutput)}`);
-    const analyticsOutput = safeJsonParse(analyticsRaw);
-
+    // Mock all other agents to save API calls
+    const researcherOutput = generateMockResearch(plannerOutput);
+    const conflictOutput = generateMockConflictResolution(executorOutput);
+    const personOutput = generateMockPersonalization(conflictOutput);
+    const simulatorOutput = generateMockSimulation(personOutput);
+    const memoryOutput = generateMockMemory(plannerOutput, criticOutput);
+    const notifOutput = generateMockNotification(personOutput);
+    const analyticsOutput = generateMockAnalytics(simulatorOutput);
 
     const response = {
       goal,
       timestamp: new Date().toISOString(),
+      api_calls_made: 3,
+      api_calls_mocked: 7,
       plan: plannerOutput,
       research: researcherOutput,
       execution: executorOutput,
