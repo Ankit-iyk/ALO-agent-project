@@ -5,7 +5,18 @@ interface AgentFeedProps {
 }
 
 export default function AgentFeed({ activeAgent }: AgentFeedProps) {
-  const agents = ['Planner', 'Researcher', 'Executor', 'Critic', 'Memory'];
+  const agents = [
+    'Planner', 
+    'Researcher', 
+    'Executor', 
+    'Conflict Resolver', 
+    'Personalization', 
+    'Simulator', 
+    'Critic', 
+    'Memory', 
+    'Notification', 
+    'Analytics'
+  ];
   
   if (!activeAgent) return null;
 

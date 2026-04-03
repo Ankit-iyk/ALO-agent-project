@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-
 const MODEL = "gemini-2.5-flash";
 
 async function callAgent(agentName: string, systemPrompt: string, userPrompt: string): Promise<string> {
@@ -15,80 +14,40 @@ async function callAgent(agentName: string, systemPrompt: string, userPrompt: st
   return result.response.text();
 }
 
-const PLANNER_PROMPT = `You are the Planner Agent in a multi-agent AI system called ALO (Autonomous Life Optimization Agent).
-Your role is to break down ANY high-level user goal into 4-6 clear, prioritized sub-goals.
-Respond ONLY with valid JSON (no markdown, no code fences) in this exact structure:
-{
-  "sub_goals": [
-    { "id": 1, "title": "Sub-goal title", "priority": "high|medium|low", "rationale": "Why this is important", "timeline": "e.g., Week 1", "category": "e.g., Health|Learning|Finance|Productivity" }
-  ],
-  "overall_strategy": "A 2-3 sentence strategic overview",
-  "success_metrics": ["metric1", "metric2", "metric3"]
-}`;
+const PLANNER_PROMPT = `You are the Planner Agent. Break down ANY high-level user goal into 4-6 clear, prioritized sub-goals.
+Respond ONLY with valid JSON structure: {"sub_goals": [{"title": "...", "priority": "high", "rationale": "...", "timeline": "...", "category": "..."}], "overall_strategy": "...", "success_metrics": ["..."]}`;
 
-const RESEARCHER_PROMPT = `You are the Researcher Agent in the ALO multi-agent system.
-Given a user goal and its sub-goals, provide evidence-based research with concise, actionable insights.
-Respond ONLY with valid JSON (no markdown, no code fences):
-{
-  "key_findings": [
-    { "sub_goal_id": 1, "finding": "Specific insight", "source_type": "Scientific study|Expert advice|Best practice", "actionability": "high|medium|low" }
-  ],
-  "quick_wins": ["Win 1", "Win 2", "Win 3"],
-  "common_pitfalls": ["Pitfall 1", "Pitfall 2"],
-  "resources": [
-    { "title": "Resource name", "type": "Book|Tool|Method|Framework", "relevance": "Why it helps" }
-  ]
-}`;
+const RESEARCHER_PROMPT = `You are the Researcher Agent. Given a user goal and sub-goals, provide actionable insights.
+Respond ONLY with valid JSON: {"key_findings": [{"finding": "...", "source_type": "...", "actionability": "high"}], "quick_wins": ["..."], "common_pitfalls": ["..."], "resources": [{"title": "...", "type": "...", "relevance": "..."}]}`;
 
-const EXECUTOR_PROMPT = `You are the Executor Agent in the ALO multi-agent system.
-Convert plans and research into concrete, actionable daily/weekly schedules and task lists.
-Respond ONLY with valid JSON (no markdown, no code fences):
-{
-  "daily_schedule": [
-    { "time": "6:00 AM", "task": "Task description", "duration": "30 min", "category": "Health|Learning|Work|Personal", "priority": "high|medium|low" }
-  ],
-  "weekly_milestones": [
-    { "week": 1, "milestone": "What to achieve", "tasks": ["Task 1", "Task 2"], "kpi": "Measurable outcome" }
-  ],
-  "immediate_actions": ["Action 1 (do today)", "Action 2", "Action 3"],
-  "tools_needed": ["Tool 1", "Tool 2"],
-  "reasoning": "Explain why this schedule/plan is optimal"
-}`;
+const EXECUTOR_PROMPT = `You are the Executor Agent. Convert plans into a daily/weekly schedule.
+Respond ONLY with valid JSON: {"daily_schedule": [{"time": "...", "task": "...", "duration": "...", "category": "...", "priority": "high"}], "weekly_milestones": [{"week": 1, "milestone": "...", "tasks": ["..."], "kpi": "..."}], "immediate_actions": ["..."], "reasoning": "..."}`;
 
-const CRITIC_PROMPT = `You are the Critic Agent in the ALO multi-agent system.
-Evaluate the plan, research, and execution schedule for feasibility, gaps, and improvements.
-Be constructive but honest. Respond ONLY with valid JSON (no markdown, no code fences):
-{
-  "overall_score": 85,
-  "strengths": ["Strength 1", "Strength 2", "Strength 3"],
-  "weaknesses": ["Weakness 1", "Weakness 2"],
-  "improvements": [
-    { "area": "Area name", "suggestion": "Specific improvement", "impact": "high|medium|low" }
-  ],
-  "risk_factors": ["Risk 1", "Risk 2"],
-  "optimized_focus": "The single most impactful thing to focus on first",
-  "confidence_score": 0.85
-}`;
+const CONFLICT_RESOLVER_PROMPT = `You are the Conflict Resolver Agent. Ensure the executor's schedule has no overlaps or burnout risks. 
+Fix resource constraints and output an optimized schedule.
+Respond ONLY with valid JSON: {"resolved_schedule": [{"time": "...", "task": "...", "duration": "...", "adjustment_reason": "..."}], "conflicts_avoided": ["..."], "optimization_score": 95}`;
 
-const MEMORY_PROMPT = `You are the Memory Agent in the ALO multi-agent system.
-Synthesize all agent outputs into a coherent summary and generate a Mermaid.js flowchart showing the reasoning chain.
-Respond ONLY with valid JSON (no markdown, no code fences):
-{
-  "session_summary": "2-3 sentence summary of the full analysis",
-  "key_decisions": ["Decision 1 made by agents", "Decision 2", "Decision 3"],
-  "mermaid_chart": "graph TD\\n  A[User Goal] --> B[Planner\\nSub-goals]\\n  B --> C[Researcher\\nFindings]\\n  C --> D[Executor\\nSchedule]\\n  D --> E[Critic\\nEvaluation]\\n  E --> F[Memory\\nSynthesis]\\n  F --> G[Optimal Plan]",
-  "next_iteration_focus": "What should be improved in the next cycle",
-  "stored_context": {
-    "goal_category": "Health|Career|Finance|Learning|Relationships|Other",
-    "complexity": "simple|moderate|complex",
-    "estimated_duration": "e.g., 30 days"
-  }
-}`;
+const PERSONALIZATION_PROMPT = `You are the Personalization Agent. Adapt the resolved schedule based on the user's profile (age, occupation, health, etc.).
+Respond ONLY with valid JSON: {"adapted_tasks": [{"original_task": "...", "adapted_task": "...", "personalization_factor": "..."}], "difficulty_adjustments": ["..."], "focus_recommendations": ["..."]}`;
+
+const SIMULATOR_PROMPT = `You are the Simulator Agent. Predict outcomes, KPIs, risk factors, and success probabilities for the personalized plan.
+Respond ONLY with valid JSON: {"predicted_kpis": [{"metric": "...", "value_by_day_30": "..."}], "success_probability": 85, "risk_factors": [{"risk": "...", "mitigation": "..."}], "recommended_path": "..."}`;
+
+const CRITIC_PROMPT = `You are the Critic Agent. Evaluate the entire plan's feasibility.
+Respond ONLY with valid JSON: {"overall_score": 85, "strengths": ["..."], "weaknesses": ["..."], "improvements": [{"area": "...", "suggestion": "...", "impact": "high"}], "optimized_focus": "..."}`;
+
+const MEMORY_PROMPT = `You are the Memory Agent. Synthesize outputs and create a Mermaid.js reasoning flow.
+Respond ONLY with valid JSON: {"session_summary": "...", "key_decisions": ["..."], "mermaid_chart": "graph TD\\n A[User Goal] --> B[Planner]", "next_iteration_focus": "..."}`;
+
+const NOTIFICATION_PROMPT = `You are the Notification Agent. Design push notifications and alerts based on the schedule.
+Respond ONLY with valid JSON: {"push_notifications": [{"trigger_time": "...", "message": "...", "urgency": "high|medium"}], "reminder_strategy": "..."}`;
+
+const ANALYTICS_PROMPT = `You are the Analytics Agent. Define JSON data structures for frontend progress graphs based on predicted KPIs.
+Respond ONLY with valid JSON: {"chart_data": [{"day": 1, "progress": 10}, {"day": 7, "progress": 30}], "dashboard_metrics": [{"label": "...", "value": "...", "trend": "up|down"}]}`;
 
 function safeJsonParse(text: string): Record<string, unknown> {
   try {
-    // Strip markdown code blocks if present
-    const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const cleaned = text.replace(/```json\n?/gi, "").replace(/```\n?/gi, "").trim();
     return JSON.parse(cleaned);
   } catch {
     return { raw: text, parse_error: true };
@@ -104,46 +63,59 @@ export async function POST(req: NextRequest) {
     }
 
     if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === "your_gemini_api_key_here") {
-      return NextResponse.json({ error: "GEMINI_API_KEY not configured. Add it to .env.local" }, { status: 500 });
+      return NextResponse.json({ error: "GEMINI_API_KEY not configured. Add it to .env" }, { status: 500 });
     }
 
-    const goalContext = `User Goal: ${goal}`;
+    // Mock User Context (since we only receive string input from UI currently)
+    const mockContext = {
+      user_profile: { age: 28, occupation: "Software Engineer", preferences: "Night owl, prefers intense short sprints" },
+      health_metrics: { avg_sleep: "6.5h", fitness_level: "Intermediate" },
+      calendar_data: { busy_hours: ["10:00 AM-2:00 PM"] }
+    };
+    const contextStr = `\n\nUser Profile: ${JSON.stringify(mockContext.user_profile)}\nHealth Metrics: ${JSON.stringify(mockContext.health_metrics)}\nCalendar Data: ${JSON.stringify(mockContext.calendar_data)}`;
 
-    // Step 1: Planner
+    const goalContext = `User Goal: ${goal}${contextStr}`;
+
+    // 1. Planner
     const plannerRaw = await callAgent("Planner", PLANNER_PROMPT, goalContext);
     const plannerOutput = safeJsonParse(plannerRaw);
 
-    // Step 2: Researcher (has context of plan)
-    const researcherRaw = await callAgent(
-      "Researcher",
-      RESEARCHER_PROMPT,
-      `${goalContext}\n\nPlanner Output: ${JSON.stringify(plannerOutput)}`
-    );
+    // 2. Researcher
+    const researcherRaw = await callAgent("Researcher", RESEARCHER_PROMPT, `${goalContext}\n\nPlanner: ${JSON.stringify(plannerOutput)}`);
     const researcherOutput = safeJsonParse(researcherRaw);
 
-    // Step 3: Executor (has context of plan + research)
-    const executorRaw = await callAgent(
-      "Executor",
-      EXECUTOR_PROMPT,
-      `${goalContext}\n\nPlan: ${JSON.stringify(plannerOutput)}\n\nResearch: ${JSON.stringify(researcherOutput)}`
-    );
+    // 3. Executor
+    const executorRaw = await callAgent("Executor", EXECUTOR_PROMPT, `${goalContext}\n\nPlan: ${JSON.stringify(plannerOutput)}\n\nResearch: ${JSON.stringify(researcherOutput)}`);
     const executorOutput = safeJsonParse(executorRaw);
 
-    // Step 4: Critic (evaluates everything)
-    const criticRaw = await callAgent(
-      "Critic",
-      CRITIC_PROMPT,
-      `${goalContext}\n\nPlan: ${JSON.stringify(plannerOutput)}\n\nResearch: ${JSON.stringify(researcherOutput)}\n\nExecution: ${JSON.stringify(executorOutput)}`
-    );
+    // 4. Conflict Resolver
+    const conflictRaw = await callAgent("Conflict Resolver", CONFLICT_RESOLVER_PROMPT, `${goalContext}\n\nExecutor Schedule: ${JSON.stringify(executorOutput)}`);
+    const conflictOutput = safeJsonParse(conflictRaw);
+
+    // 5. Personalization
+    const personRaw = await callAgent("Personalization", PERSONALIZATION_PROMPT, `${goalContext}\n\nResolved Schedule: ${JSON.stringify(conflictOutput)}`);
+    const personOutput = safeJsonParse(personRaw);
+
+    // 6. Simulator
+    const simulatorRaw = await callAgent("Simulator", SIMULATOR_PROMPT, `${goalContext}\n\nAdapted Tasks: ${JSON.stringify(personOutput)}`);
+    const simulatorOutput = safeJsonParse(simulatorRaw);
+
+    // 7. Critic
+    const criticRaw = await callAgent("Critic", CRITIC_PROMPT, `${goalContext}\n\nPlan: ${JSON.stringify(plannerOutput)}\n\nSimulator Params: ${JSON.stringify(simulatorOutput)}`);
     const criticOutput = safeJsonParse(criticRaw);
 
-    // Step 5: Memory (synthesizes all)
-    const memoryRaw = await callAgent(
-      "Memory",
-      MEMORY_PROMPT,
-      `${goalContext}\n\nPlan: ${JSON.stringify(plannerOutput)}\n\nResearch: ${JSON.stringify(researcherOutput)}\n\nExecution: ${JSON.stringify(executorOutput)}\n\nCritique: ${JSON.stringify(criticOutput)}`
-    );
+    // 8. Memory
+    const memoryRaw = await callAgent("Memory", MEMORY_PROMPT, `${goalContext}\n\nPlan: ${JSON.stringify(plannerOutput)}\n\nCritic Review: ${JSON.stringify(criticOutput)}`);
     const memoryOutput = safeJsonParse(memoryRaw);
+
+    // 9. Notification
+    const notifRaw = await callAgent("Notification", NOTIFICATION_PROMPT, `${goalContext}\n\nAdapted Tasks: ${JSON.stringify(personOutput)}`);
+    const notifOutput = safeJsonParse(notifRaw);
+
+    // 10. Analytics
+    const analyticsRaw = await callAgent("Analytics", ANALYTICS_PROMPT, `${goalContext}\n\nSimulator Prediction: ${JSON.stringify(simulatorOutput)}`);
+    const analyticsOutput = safeJsonParse(analyticsRaw);
+
 
     const response = {
       goal,
@@ -151,15 +123,13 @@ export async function POST(req: NextRequest) {
       plan: plannerOutput,
       research: researcherOutput,
       execution: executorOutput,
+      conflict: conflictOutput,
+      personalization: personOutput,
+      simulator: simulatorOutput,
       critique: criticOutput,
       memory: memoryOutput,
-      reasoning_chain: [
-        { agent: "Planner", status: "complete", output_keys: Object.keys(plannerOutput) },
-        { agent: "Researcher", status: "complete", output_keys: Object.keys(researcherOutput) },
-        { agent: "Executor", status: "complete", output_keys: Object.keys(executorOutput) },
-        { agent: "Critic", status: "complete", output_keys: Object.keys(criticOutput) },
-        { agent: "Memory", status: "complete", output_keys: Object.keys(memoryOutput) },
-      ],
+      notification: notifOutput,
+      analytics: analyticsOutput,
     };
 
     return NextResponse.json(response);
