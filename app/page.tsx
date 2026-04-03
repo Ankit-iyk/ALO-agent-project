@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState } from 'react';
 import GoalInput from '@/components/GoalInput';
@@ -73,11 +73,10 @@ export default function Home() {
     <div className="container" style={{ maxWidth: '1400px' }}>
       <header style={{ textAlign: 'center', marginBottom: '3rem', paddingTop: '2rem' }}>
         <h1 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', fontSize: '3rem', margin: 0 }}>
-          <span style={{ color: 'var(--accent-secondary)' }}>ALO 2.0</span>
-          <span>Agent Core</span>
+          <span style={{ color: 'var(--accent-secondary)' }}>AgentOS</span>
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem', margin: '0.5rem 0 0 0' }}>
-          Autonomous Multi-Agent Life Optimization (10 Agents)
+          Turn Goals into Execution using AI Agents
         </p>
       </header>
 
