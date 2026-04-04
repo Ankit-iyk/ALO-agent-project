@@ -126,6 +126,12 @@ Structured JSON Output
 UI Rendering
 ```
 
+## 🏗️ System Architecture
+
+![Architecture Diagram](scripts/architecture.png)
+
+
+
 ---
 
 ## 🛠️ Tech Stack
